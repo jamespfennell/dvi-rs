@@ -28,14 +28,16 @@
 //! See SPECIFICATION.md for more details
 
 mod dumper;
+#[cfg(feature = "parse")]
 mod parser;
 mod traits;
 pub(crate) mod util;
 
+#[cfg(feature = "parse")]
 pub use nom::IResult;
 use std::io::{self, Write};
 
-pub use crate::traits::{Dump, Parse};
+pub use crate::traits::*;
 
 /// A font definition
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -299,12 +301,14 @@ impl Instruction {
     }
 
     /// Parse an instruction from a byte slice
+    #[cfg(feature = "parse")]
     pub fn parse(bytes: &[u8]) -> IResult<&[u8], Self> {
         parser::parse(bytes)
     }
 }
 
 #[cfg(test)]
+#[cfg(feature = "parse")]
 mod tests {
     use super::*;
 

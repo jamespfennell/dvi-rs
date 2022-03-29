@@ -1,5 +1,3 @@
-use nom::IResult;
-
 /// Get the number of bytes required to store a u32
 pub(crate) fn byte_width(val: u32) -> u8 {
     if (val & !0xffu32) == 0 {
@@ -32,7 +30,8 @@ pub(crate) fn byte_width_signed(val: i32) -> u8 {
 /// A parser to count the number of times the byte 223 occurs. This parser converts Incomplete to
 /// Done, which is normally bad, but since these trailing bytes make no difference to the semantic
 /// meaning of the document, we don't care if we haven't read them all yet.
-pub(crate) fn parse_223(mut i: &[u8]) -> IResult<&[u8], u32> {
+#[cfg(feature = "parse")]
+pub(crate) fn parse_223(mut i: &[u8]) -> super::IResult<&[u8], u32> {
     use nom::bytes::streaming::tag;
 
     let mut count = 0;
