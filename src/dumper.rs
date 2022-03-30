@@ -4,6 +4,7 @@ use crate::{
     FontDef, Instruction,
 };
 use byteorder::{BigEndian, WriteBytesExt};
+use std::convert::TryInto;
 use std::io::{self, Write};
 
 // Helper macros
@@ -259,11 +260,16 @@ fn dump_font<W: Write>(f: u32, writer: &mut W) -> io::Result<()> {
 }
 
 fn dump_xxx<W: Write>(data: &[u8], writer: &mut W) -> io::Result<()> {
-    assert!(
-        data.len() < ::std::u32::MAX as usize,
-        "The length of extention data won't fit in 32 bits"
-    );
-    write_small!(unsigned data.len() as u32, writer => 239, 240, 241, 242)?;
+    let data_len: u32 = match data.len().try_into() {
+        Ok(data_len) => data_len,
+        Err(_) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "The length of extention data won't fit in 32 bits",
+            ));
+        }
+    };
+    write_small!(unsigned data_len, writer => 239, 240, 241, 242)?;
     writer.write_all(data)?;
     Ok(())
 }
@@ -275,27 +281,34 @@ fn dump_font_def_helper<W: Write>(v: u32, writer: &mut W) -> io::Result<()> {
 }
 
 fn dump_font_def<W: Write>(def: &FontDef, writer: &mut W) -> io::Result<()> {
-    assert!(
-        def.filename.len() <= ::std::u8::MAX as usize,
-        "Filename too long in Font Definition"
-    );
-    assert!(
-        if let Some(ref d) = def.directory {
-            d.len() <= ::std::u8::MAX as usize
-        } else {
-            true
-        },
-        "Directory name too long in Font Definition"
-    );
+    let filename_len: u8 = match def.filename.len().try_into() {
+        Ok(filename_len) => filename_len,
+        Err(_) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Filename too long in Font Definition",
+            ));
+        }
+    };
+    let directory_len: u8 = if let Some(ref d) = def.directory {
+        match d.len().try_into() {
+            Ok(directory_len) => directory_len,
+            Err(_) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Directory name too long in Font Definition",
+                ))
+            }
+        }
+    } else {
+        0
+    };
     dump_font_def_helper(def.number, writer)?;
     writer.write_u32::<BigEndian>(def.checksum)?;
     writer.write_u32::<BigEndian>(def.scale_factor)?;
     writer.write_u32::<BigEndian>(def.design_size)?;
-    match def.directory {
-        Some(ref d) => writer.write_u8(d.len() as u8),
-        None => writer.write_u8(0),
-    }?;
-    writer.write_u8(def.filename.len() as u8)?;
+    writer.write_u8(directory_len)?;
+    writer.write_u8(filename_len)?;
     if let Some(ref d) = def.directory {
         writer.write_all(&d[..])?
     };
@@ -312,13 +325,21 @@ fn dump_pre<W: Write>(
     comment: &[u8],
     writer: &mut W,
 ) -> io::Result<()> {
-    assert!(comment.len() < 0x100, "Comment length must fit into u8");
+    let comment_len: u8 = match comment.len().try_into() {
+        Ok(comment_len) => comment_len,
+        Err(_) => {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Comment length must fit into u8",
+            ));
+        }
+    };
     writer.write_u8(247)?;
     writer.write_u8(format)?;
     writer.write_u32::<BigEndian>(numerator)?;
     writer.write_u32::<BigEndian>(denominator)?;
     writer.write_u32::<BigEndian>(magnification)?;
-    writer.write_u8(comment.len() as u8)?;
+    writer.write_u8(comment_len)?;
     writer.write_all(comment)?;
     Ok(())
 }
